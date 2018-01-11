@@ -1,0 +1,71 @@
+- name: Build supporting artifacts and get paths
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Build Nix and get path
+      shell: nix-build pkgs.nix -A nix --no-out-link
+      register: nix_build
+
+    # This tarball contains the closure of Nix, which it blindly
+    # extracts out into /nix/store, then initializes the Nix database
+    # with the associated valid path info.
+    - name: Build Nix bootstrap self-extracting tarball and get path
+      shell: nix-build --expr '(import ./pkgs.nix).callPackage (import ./tarball) {}' --no-out-link
+      register: nix_bootstrap_build
+
+    - set_fact:
+        nix: "{{ nix_build.stdout }}"
+        nix_bootstrap: "{{ nix_bootstrap_build.stdout }}"
+
+- name: Run the Nix setup tasks
+  remote_user: root
+  gather_facts: no
+  vats:
+    nix: "{{ hostvars['localhost']['nix'] }}"
+    nix_bootstrap: "{{ hostvars['localhost']['nix_bootstrap'] }}"
+  tasks:
+    - name: Check if {{nix}} exists to determine whether we need to install/update
+      stat: path={{nix}}
+      register: nix_stat
+
+    - name: Run the Nix bootstrap to install/update a new version of Nix
+      script: {{ nix_bootstrap }}
+      when: not nix_stat.stat.exists
+
+    # Can we implicitly/automatically do these four, somehow?
+    - name: Ensure /nix/var/nix/gcroots/ exists
+      file: path=/nix/var/nix/gcroots state=directory mode=0755
+
+    - name: Ensure /nix/var/nix/gcroots/per-user/ has the correct permissions
+      file: path=/nix/var/nix/gcroots/per-user state=directory mode=01777
+
+    - name: Ensure /nix/var/nix/profiles/ exists
+      file: path=/nix/var/nix/profiles/per-user state=directory mode=0755
+
+    - name: Ensure /nix/var/nix/profiles/per-user/ exists with correct permissions
+      file: path=/nix/var/nix/profiles/per-user state=directory mode=01777
+
+    - name: Add GC root for updated version of Nix
+      file: src="{{nix}}" dest=/nix/var/nix/gcroots/system_nix state=link
+
+    - name: Update systemd service to new Nix
+      file:
+        src: "{{nix}}/lib/systemd/system/nix-daemon.service"
+        dest: /etc/systemd/system/nix-daemon.service
+        state: link
+      notify: restart nix-daemon
+
+    - name: Update systemd socket to new Nix
+      file:
+        src: "{{nix}}/lib/systemd/system/nix-daemon.socket"
+        dest: /etc/systemd/system/nix-daemon.socket
+        state: link
+      notify: restart nix-daemon
+
+  handlers:
+    - name: restart nix-daemon
+      systemd:
+        daemon_reload: yes
+        state: restarted
+        name: nix-daemon
