@@ -1,6 +1,7 @@
 { runCommand, fpm, binutils, nix, perl, pathsFromGraph, shellcheck }:
 runCommand "nix.deb" {
   buildInputs = [ fpm binutils ];
+  version = nix.version;
   sharball = (import ../tarball) { inherit runCommand nix perl pathsFromGraph shellcheck; };
 }
   ''
@@ -31,6 +32,11 @@ runCommand "nix.deb" {
     mkdir -p nix/var/nix/gcroots/
     ln -sf $nix nix/var/nix/gcroots/system_nix
 
-    fpm -s dir -t deb -n nix --deb-no-default-config-files --post-install ${./install.sh} -p $out usr/ etc/ nix/
+    fpm -s dir -t deb \
+        -n nix \
+        -v $version \
+        --deb-no-default-config-files \
+        --post-install ${./install.sh} \
+        -p $out usr/ etc/ nix/
   ''
 
