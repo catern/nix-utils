@@ -6,7 +6,7 @@ bootstrap=/usr/lib/nix/bootstrap.tar.bz.sh
 nix="$($bootstrap --print-packaged-nix-path)"
 
 if ! test -e $nix; then
-   ./$bootstrap
+   $bootstrap
 fi
 
 # initialize per-user roots directory.  we create these here because
