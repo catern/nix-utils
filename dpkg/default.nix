@@ -20,7 +20,6 @@ runCommand "nix.deb" {
 
     # create links to binaries
     mkdir -p usr/bin
-    ln -sf $nix/bin usr/bin
     for binary in $nix/bin/*; do
       ln -sf $binary usr/bin/;
     done
