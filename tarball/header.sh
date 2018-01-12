@@ -36,8 +36,24 @@ cat_tarball() {
     sed '0,/^__begin_archive__$/d' "$0"
 }
 
+echo "ensuring @storedir@ exists and is writable by us" >&2
+mkdir -p --mode=00755 @storedir@
+if ! test -w @storedir@; then
+    oops "@storedir@ is not writable by us"
+fi
+
 echo "extracting tarball..." >&2
-if ! cat_tarball | bzcat | tar --verbose --extract --absolute-names --transform "s,reginfo,$reginfo," >&2; then
+if ! cat_tarball | \
+        bzcat | \
+        tar \
+            --unlink-first \
+            --recursive-unlink \
+            --verbose \
+            --extract \
+            --absolute-names \
+            --transform "s,reginfo,$reginfo," \
+            >&2;
+then
     oops "failed to extract tarball"
 fi
 

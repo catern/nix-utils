@@ -14,9 +14,10 @@ runCommand "nix-bootstrap-shar-${nix.version}-${nix.system}.sh" {
   ''
     storePaths=$(perl ${pathsFromGraph} ./closure)
     printRegistration=1 perl ${pathsFromGraph} ./closure > $TMPDIR/reginfo
-    substitute ${./header.sh} $out --subst-var-by nix ${nix}
 
-    shellcheck -e SC1090 $out
+    substitute ${./header.sh} $out --subst-var-by nix ${nix} --subst-var-by storedir ${builtins.storeDir}
+
+    shellcheck -e SC2174 $out
     chmod +x $out
 
     tar --create --bzip2 \
