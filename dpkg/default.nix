@@ -6,6 +6,7 @@ runCommand "nix.deb" {
   sharball = (import ../tarball) { inherit runCommand nix perl pathsFromGraph shellcheck; };
 }
   ''
+    set -o nounset -o errexit
     cd $TMPDIR
 
     # copy in the Nix bootstrap sharball
