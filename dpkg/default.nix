@@ -1,11 +1,11 @@
 { runCommand, fpm, binutils, nix, perl, pathsFromGraph, shellcheck }:
 runCommand "nix.deb" {
   buildInputs = [ fpm binutils ];
+  inherit nix;
   version = nix.version;
   sharball = (import ../tarball) { inherit runCommand nix perl pathsFromGraph shellcheck; };
 }
   ''
-    nix=${nix}
     cd $TMPDIR
 
     # copy in the Nix bootstrap sharball
