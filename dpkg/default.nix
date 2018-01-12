@@ -1,9 +1,7 @@
-{ runCommand, nix, perl, pathsFromGraph, shellcheck, fpm, binutils }:
-let
-  sharball = import ../tarball/doit.nix;
-in
+{ runCommand, fpm, binutils, nix, perl, pathsFromGraph, shellcheck }:
 runCommand "nix.deb" {
   buildInputs = [ fpm binutils ];
+  sharball = (import ../tarball) { inherit runCommand nix perl pathsFromGraph shellcheck; };
 }
   ''
     nix=${nix}
@@ -11,7 +9,7 @@ runCommand "nix.deb" {
 
     # copy in the Nix bootstrap sharball
     mkdir -p usr/lib/nix/
-    cp ${sharball} usr/lib/nix/bootstrap.tar.bz.sh
+    cp $sharball usr/lib/nix/bootstrap.tar.bz.sh
 
     # copy systemd unit files, rather than linking them, to avoid systemd symlink issues
     mkdir -p usr/lib/systemd/system/
