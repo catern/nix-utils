@@ -13,12 +13,12 @@ runCommand "nix.deb" {
     mkdir -p usr/lib/nix/
     cp ${sharball} usr/lib/nix/bootstrap.tar.bz.sh
 
-    # create links to systemd unit files
+    # copy systemd unit files, rather than linking them, to avoid systemd symlink issues
     mkdir -p usr/lib/systemd/system/
-    ln -sf $nix/lib/systemd/system/nix-daemon.socket usr/lib/systemd/system/nix-daemon.socket
-    ln -sf $nix/lib/systemd/system/nix-daemon.service usr/lib/systemd/system/nix-daemon.service
+    cp $nix/lib/systemd/system/nix-daemon.socket usr/lib/systemd/system/nix-daemon.socket
+    cp $nix/lib/systemd/system/nix-daemon.service usr/lib/systemd/system/nix-daemon.service
 
-    # create links to binaries
+    # link the binaries to standard location
     mkdir -p usr/bin
     for binary in $nix/bin/*; do
       ln -sf $binary usr/bin/;
@@ -29,7 +29,7 @@ runCommand "nix.deb" {
     ln -sf $nix/etc/profile.d/nix-daemon.sh etc/profile.d/nix-daemon.sh
     ln -sf $nix/etc/profile.d/nix.sh etc/profile.d/nix.sh
 
-    # create garbage collector root to bootstrapped version of Nix
+    # create garbage collector root symlink to bootstrapped version of Nix
     mkdir -p nix/var/nix/gcroots/
     ln -sf $nix nix/var/nix/gcroots/system_nix
 
