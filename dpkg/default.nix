@@ -24,10 +24,10 @@ runCommand "nix.deb" {
       ln -sf $binary usr/bin/;
     done
 
-    # create links to profile initialization files
+    # copy profile initialization files, rather than linking them, to allow editing in extremity
     mkdir -p etc/profile.d/
-    ln -sf $nix/etc/profile.d/nix-daemon.sh etc/profile.d/nix-daemon.sh
-    ln -sf $nix/etc/profile.d/nix.sh etc/profile.d/nix.sh
+    cp $nix/etc/profile.d/nix-daemon.sh etc/profile.d/nix-daemon.sh
+    cp $nix/etc/profile.d/nix.sh etc/profile.d/nix.sh
 
     # create garbage collector root symlink to bootstrapped version of Nix
     mkdir -p nix/var/nix/gcroots/
