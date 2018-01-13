@@ -1,5 +1,5 @@
 { runCommand, fpm, binutils, nix, perl, pathsFromGraph, shellcheck }:
-runCommand "nix.deb" {
+runCommand "nix-${nix.version}.deb" {
   buildInputs = [ fpm binutils ];
   inherit nix;
   version = nix.version;
