@@ -31,7 +31,7 @@ runCommand "nix-${nix.version}.deb" {
 
     # create garbage collector root symlink to bootstrapped version of Nix
     mkdir -p nix/var/nix/gcroots/
-    ln -sf $nix nix/var/nix/gcroots/system_nix
+    ln -sf $nix nix/var/nix/gcroots/nix_installed_with_dpkg
 
     fpm -s dir -t deb \
         -n nix \
