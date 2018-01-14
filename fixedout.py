@@ -1,3 +1,16 @@
+"""The main useful functions in this file are
+build_drv_with_impure_fixouts and realise_path_with_impure_fixouts.
+
+This file uses the "nix show-derivation" and "nix path-info"
+subcommands from Nix 1.12.
+
+It seems to me that the right way to do what these functions do, is
+with some untrusted offloader mechanism, whereby a user can specify
+offloaders when they start builds, and those untrusted offloaders are
+used for fixed-output derivations. This should be built into Nix.
+
+"""
+
 import os
 import subprocess
 import json
@@ -5,23 +18,19 @@ import functools
 import tempfile
 import shutil
 
-# It seems to me that the correct way to do this is with some
-# untrusted offloader mechanism, where a user can specify offloaders
-# when they start builds, and those untrusted offloaders are used for
-# fixed-output derivations.
-
-nix_tarball_drv = "/nix/store/h0m0794x8d02hyrwkby3asajnz2s2g6n-nix-1.11.15.tar.xz.drv"
-
 @functools.lru_cache()
 def load_derivation(drv):
     data = subprocess.check_output(['nix', 'show-derivation', drv]).decode()
     return json.loads(data)[drv]
 
-def get_drv_deps(drv):
-    data = load_derivation(drv)
-    return data['inputDrvs'].keys()
+@functools.lru_cache()
+def get_path_info(path):
+    return json.loads(subprocess.check_output(['nix', 'path-info', '--json', path]).decode())[0]
 
-def is_fixed_output(drv):
+def get_deriver(path):
+    return get_path_info(path)['deriver']
+
+def is_fixout(drv):
     data = load_derivation(drv)
     try:
         data['outputs']['out']['hash']
@@ -29,53 +38,73 @@ def is_fixed_output(drv):
     except KeyError:
         return False
 
-def get_path_info(path):
-    return json.loads(subprocess.check_output(['nix', 'path-info', '--json', path]).decode())[0]
-
-def is_valid(drv):
+def input_drvs_with_paths(drv):
     data = load_derivation(drv)
-    output_path = data['outputs']['out']['path']
-    # if there's no 'valid' field, it's valid
-    return get_path_info(output_path).get('valid', True)
-
-# Checking for substitutability is hard. Realising while only using
-# substitutes is also hard. Since we can't do either of those, let's
-# just not check for substitutability. Just try running the build once
-# manually, so that anything substitutable becomes valid.
-def is_substitutable(drv):
-    return False
-    # return subprocess.call(["nix-store", "-Q", "-j0", "--realise", drv]) == 0
-
-def needed_fixed_output_drvs(drv, already_seen=None):
-    "Outputs the unbuilt fixed-output-derivations needed to build this derivation, in topologically sorted order."
-    if already_seen is None:
-        already_seen = set()
-    if drv in already_seen:
-        return []
-    already_seen.add(drv)
-    if is_valid(drv):
-        return []
-    if is_substitutable(drv):
-        return []
     ret = []
-    for dep in get_drv_deps(drv):
-        ret += needed_fixed_output_drvs(dep, already_seen)
-    if is_fixed_output(drv):
-        ret.append(drv)
+    for drv in data['inputDrvs']:
+        wanted_paths = []
+        dep_data = load_derivation(drv)['outputs']
+        for output in data['inputDrvs'][drv]:
+            wanted_paths.append(dep_data[output]['path'])
+        ret.append((drv, wanted_paths))
     return ret
 
+def ensurePath(path):
+    """This is an indirect way to call ensurePath in store-api.hh
+
+    Essentially, this does:
+    if is_valid(path):
+      return True
+    try_substitute(path)
+    return is_valid(path)
+
+    """
+    args = ["nix-instantiate",
+            "--read-write-mode",
+            "--eval",
+            "--expr",
+            "__storePath {}".format(path)]
+    return subprocess.run(args, stdout=subprocess.DEVNULL).returncode == 0
+
+
+def build_drv_with_impure_fixouts(drv):
+    "Build this deriver, passing off any fixouts we need to build off to a local impure builder."
+    # to build this deriver, we need to realise all the deriver's input paths.
+    for drv, wanted_paths in input_drvs_with_paths(drv):
+        # no need to build if we can substitute all the specifically
+        # wanted paths that are output by this deriver.
+        if all(ensurePath(path) for path in wanted_paths):
+            continue
+        # have to build after all. wanted_paths is now irrelevant
+        # because the deriver will build every output anyway
+        build_drv_with_impure_fixouts(drv)
+    # all the inputs are valid, so now we can perform the build.
+    if is_fixout(drv):
+        # if this derivation is fixout, then we impurely build it.
+        impure_build(drv)
+    else:
+        # otherwise, just build it normally
+        build(drv)
+
+def realise_path_with_impure_fixouts(path):
+    "Realise this path, passing off any fixouts we need to build off to a local impure builder."
+    # if we can substitute the path, or it's already valid, we're already done
+    if ensurePath(path):
+        return
+    # okay, this path isn't already valid and we can't substitute it.
+    # so we need to build the path, using its deriver.
+    build_drv_with_impure_fixouts(get_deriver(path))
+
 def impure_build(drv):
+    "Impurely build this derivation in the current environment and add it to the store."
     # only fixed output derivations can be build impurely
     if not is_fixed_output(drv):
         raise Exception
-    # no need to rebuild something which is already built
-    if is_valid(drv):
-        print(drv, "is already valid")
-        return
     data = load_derivation(drv)
     _, name = data['outputs']['out']['path'].split('-', 1)
-    # TODO should actually try to build these, I guess
-    assert(all(is_valid(indrv) for indrv in data['inputDrvs'].keys()))
+    # all my inputs need to be valid
+    if not all(ensurePath(indrv) for indrv in data['inputDrvs'].keys()):
+        raise Exception("Not all my inputs are valid.")
     workdir = tempfile.mkdtemp()
     top_outdir = tempfile.mkdtemp()
     output = os.path.join(top_outdir, "out")
@@ -101,6 +130,16 @@ def impure_build(drv):
     shutil.rmtree(top_outdir)
     shutil.rmtree(mydir)
 
-def impurely_build_fixed_output_deps(drv):
-    for drv in needed_fixed_output_drvs(drv):
-        impure_build(drv)
+def build(drv):
+    "Build this derivation using normal nix-store --realise"
+    subprocess.run(['nix-store', '--realise', drv], check=True)
+
+if __name__ == "__main__":
+    import sys
+    path = sys.argv[1]
+    if path.endswith(".drv"):
+        print("Assuming", path, "is a derivation, invoking build_drv_with_impure_fixouts")
+        build_drv_with_impure_fixouts(path)
+    else:
+        print("Assuming", path, "is a path, invoking realise_path_with_impure_fixouts")
+        realise_path_with_impure_fixouts(path)
