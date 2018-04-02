@@ -41,12 +41,12 @@ def is_fixed_output(drv):
 def input_drvs_with_paths(drv):
     data = load_derivation(drv)
     ret = []
-    for drv in data['inputDrvs']:
+    for input_drv in data['inputDrvs']:
         wanted_paths = []
-        dep_data = load_derivation(drv)['outputs']
-        for output in data['inputDrvs'][drv]:
+        dep_data = load_derivation(input_drv)['outputs']
+        for output in data['inputDrvs'][input_drv]:
             wanted_paths.append(dep_data[output]['path'])
-        ret.append((drv, wanted_paths))
+        ret.append((input_drv, wanted_paths))
     return ret
 
 def ensurePath(path):
