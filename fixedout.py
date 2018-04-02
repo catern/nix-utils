@@ -102,6 +102,9 @@ def realise_path_with_impure_fixouts(path):
     # so we need to build the path, using its deriver.
     build_drv_with_impure_fixouts(get_deriver(path))
 
+class BuildFailedError(Exception):
+    pass
+
 def impure_build(drv):
     "Impurely build this derivation in the current environment and add it to the store."
     # only fixed output derivations can be build impurely
@@ -125,7 +128,7 @@ def impure_build(drv):
     cmdline = [data['builder']] + data['args']
     proc = subprocess.Popen(cmdline, cwd=workdir, env=env)
     if proc.wait() != 0:
-        raise Exception
+        raise BuildFailedError
     mydir = tempfile.mkdtemp()
     print("mydir", mydir)
     finalpath = os.path.join(mydir, name)
