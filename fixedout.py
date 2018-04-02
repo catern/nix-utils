@@ -30,7 +30,7 @@ def get_path_info(path):
 def get_deriver(path):
     return get_path_info(path)['deriver']
 
-def is_fixout(drv):
+def is_fixed_output(drv):
     data = load_derivation(drv)
     try:
         data['outputs']['out']['hash']
@@ -79,7 +79,7 @@ def build_drv_with_impure_fixouts(drv):
         # because the deriver will build every output anyway
         build_drv_with_impure_fixouts(drv)
     # all the inputs are valid, so now we can perform the build.
-    if is_fixout(drv):
+    if is_fixed_output(drv):
         # if this derivation is fixout, then we impurely build it.
         impure_build(drv)
     else:
