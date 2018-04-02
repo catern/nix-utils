@@ -130,7 +130,6 @@ def impure_build(drv):
     if proc.wait() != 0:
         raise BuildFailedError
     mydir = tempfile.mkdtemp()
-    print("mydir", mydir)
     finalpath = os.path.join(mydir, name)
     os.rename(output, finalpath)
     hashAlgo = data['outputs']['out']['hashAlgo']
@@ -160,7 +159,8 @@ if __name__ == "__main__":
     path = sys.argv[1]
     if path.endswith(".drv"):
         print("Assuming", path, "is a derivation, invoking build_drv_with_impure_fixouts")
-        build_drv_with_impure_fixouts(path)
+        for output in build_drv_with_impure_fixouts(path):
+            print(output)
     else:
         print("Assuming", path, "is a path, invoking realise_path_with_impure_fixouts")
         realise_path_with_impure_fixouts(path)
