@@ -107,6 +107,10 @@ def impure_build(drv):
     # only fixed output derivations can be build impurely
     if not is_fixed_output(drv):
         raise Exception
+    output_paths = all_output_paths(drv)
+    if len(output_paths) != 1:
+        raise Exception("doesn't support multiple outputs")
+    output_path = output_paths[0]
     data = load_derivation(drv)
     _, name = data['outputs']['out']['path'].split('-', 1)
     # all my inputs need to be valid
@@ -132,7 +136,14 @@ def impure_build(drv):
         option, hashAlgo = hashAlgo.split(':')
         recursive = ["--recursive"]
         assert(option == 'r')
-    subprocess.check_call(['nix-store', '--add-fixed', hashAlgo, finalpath] + recursive)
+    ending_path = subprocess.check_output(['nix-store', '--add-fixed', hashAlgo, finalpath] + recursive).strip().decode()
+    if output_path != ending_path:
+        print("Expected path:", output_path)
+        print("Does not match path we ended up with:", ending_path)
+        print("workdir", workdir)
+        print("top_outdir", top_outdir)
+        print("mydir", mydir)
+        raise Exception
     shutil.rmtree(workdir)
     shutil.rmtree(top_outdir)
     shutil.rmtree(mydir)
