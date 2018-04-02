@@ -38,6 +38,10 @@ def is_fixed_output(drv):
     except KeyError:
         return False
 
+def all_output_paths(drv):
+    data = load_derivation(drv)
+    return [output['path'] for output in data['outputs'].values()]
+
 def input_drvs_with_paths(drv):
     data = load_derivation(drv)
     ret = []
@@ -66,18 +70,20 @@ def ensurePath(path):
             "__storePath {}".format(path)]
     return subprocess.run(args, stdout=subprocess.DEVNULL).returncode == 0
 
-
-def build_drv_with_impure_fixouts(drv):
+def build_drv_with_impure_fixouts(drv, wanted_paths=None):
     "Build this deriver, passing off any fixouts we need to build off to a local impure builder."
-    # to build this deriver, we need to realise all the deriver's input paths.
-    for drv, wanted_paths in input_drvs_with_paths(drv):
-        # no need to build if we can substitute all the specifically
-        # wanted paths that are output by this deriver.
-        if all(ensurePath(path) for path in wanted_paths):
-            continue
-        # have to build after all. wanted_paths is now irrelevant
-        # because the deriver will build every output anyway
-        build_drv_with_impure_fixouts(drv)
+    # if wanted paths is not specified, we want everything
+    if wanted_paths is None:
+        wanted_paths = all_output_paths(drv)
+    # no need to build if we can substitute all the specifically
+    # wanted paths that are output by this derivation.
+    if all(ensurePath(path) for path in wanted_paths):
+        return wanted_paths
+    # We have to build after all. wanted_paths is now irrelevant
+    # because the derivation will build every output anyway.
+    # Frist, to build this derivation, we need to realise all the deriver's input paths.
+    for input_drv, input_wanted_paths in input_drvs_with_paths(drv):
+        build_drv_with_impure_fixouts(input_drv, wanted_paths=input_wanted_paths)
     # all the inputs are valid, so now we can perform the build.
     if is_fixed_output(drv):
         # if this derivation is fixout, then we impurely build it.
@@ -85,6 +91,7 @@ def build_drv_with_impure_fixouts(drv):
     else:
         # otherwise, just build it normally
         build(drv)
+    return wanted_paths
 
 def realise_path_with_impure_fixouts(path):
     "Realise this path, passing off any fixouts we need to build off to a local impure builder."
