@@ -123,6 +123,10 @@ def impure_build(drv):
     top_outdir = tempfile.mkdtemp()
     output = os.path.join(top_outdir, "out")
     env = os.environ.copy()
+    for key in list(env.keys()):
+        # these can cause problems
+        if key in ['LANG']:
+            del env[key]
     env.update(data['env'])
     env.update({'NIX_BUILD_TOP': workdir, 'out': output, 'TMPDIR': workdir})
     cmdline = [data['builder']] + data['args']
