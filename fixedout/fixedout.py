@@ -158,9 +158,19 @@ def build(drv):
     "Build this derivation using normal nix-store --realise"
     subprocess.run(['nix-store', '--realise', drv], check=True)
 
-if __name__ == "__main__":
+def main() -> None:
     import sys
-    path = sys.argv[1]
+    import argparse
+    parser = argparse.ArgumentParser(
+        description=
+"""Build a Nix package, impurely building the fixed outputs as the current user.
+This is useful when operating in an environment where internet access
+is only granted for certain users, and using that user's credentials.
+""",
+    )
+    parser.add_argument('path', help='The path to realise or derivation to build')
+    args = parser.parse_args()
+    path = args.path
     if path.endswith(".drv"):
         print("Assuming", path, "is a derivation, invoking build_drv_with_impure_fixouts")
         for output in build_drv_with_impure_fixouts(path):
@@ -168,3 +178,6 @@ if __name__ == "__main__":
     else:
         print("Assuming", path, "is a path, invoking realise_path_with_impure_fixouts")
         realise_path_with_impure_fixouts(path)
+
+if __name__ == "__main__":
+    main()

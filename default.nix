@@ -1,7 +1,7 @@
-let
-  pkgs = import ./pkgs.nix;
-in
-{
-  tarball = pkgs.callPackage (import ./tarball) {};
-  dpkg = pkgs.callPackage (import ./dpkg) {};
+{ pkgs ? import <nixpkgs> {} }:
+
+with pkgs.python37Packages;
+buildPythonPackage {
+  name = "nix-utils";
+  src = ./.;
 }
