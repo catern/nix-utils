@@ -1,9 +1,10 @@
-{ runCommand, fpm, binutils, nix, perl, pathsFromGraph, shellcheck }:
+{ runCommand, fpm, binutils, nix, perl, pathsFromGraph, shellcheck
+, sharball  ? import ../tarball { inherit runCommand nix perl pathsFromGraph shellcheck; }
+}:
 runCommand "nix-${nix.version}.deb" {
   buildInputs = [ fpm binutils ];
-  inherit nix;
+  inherit nix sharball;
   version = nix.version;
-  sharball = (import ../tarball) { inherit runCommand nix perl pathsFromGraph shellcheck; };
 }
   ''
     set -o nounset -o errexit
