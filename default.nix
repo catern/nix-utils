@@ -1,6 +1,8 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> {}
+, python3Packages ? pkgs.python3Packages
+}:
 
-with pkgs.python37Packages;
+with python3Packages;
 buildPythonPackage {
   name = "nix-utils";
   src = ./.;
